@@ -123,9 +123,12 @@ export class Start extends Phaser.Scene {
         if (this.sync_event) {
             this.sync_event.remove();
         }
+        if (this.timer_event) {
+            this.timer_event.remove();
+        }
         this.status = SHUTDOWN;
         this.start_event = this.time.addEvent({
-            delay: 1000, // 毫秒
+            delay: 5000, // 毫秒
             callback: this.start_game,
             callbackScope: this,
             loop: true
@@ -137,6 +140,7 @@ export class Start extends Phaser.Scene {
         let r = await fetch(`${HOST}/api/round_info`).then(r => r.json());
         if (r["status"] == "running" && !r["expired"]) {
             this.status = RUNNING;
+            this.turn = Math.floor(r["elapsed_seconds"] / 1.5);
         } else {
             if (this.status == RUNNING) {
                 this.restart();
@@ -158,7 +162,7 @@ export class Start extends Phaser.Scene {
         this.sync_character();
         this.sync_chest();
         this.sync_event = this.time.addEvent({
-            delay: 1000, // 毫秒
+            delay: 5000, // 毫秒
             callback: async () => {
                 let r = await fetch(`${HOST}/api/round_info`).then(r => r.json());
                 if (r["status"] != "running" || r["expired"]) {
@@ -174,6 +178,12 @@ export class Start extends Phaser.Scene {
             callbackScope: this,
             loop: true
         });
+        this.timer_event = this.time.addEvent({
+            delay: 1000,
+            callback: () => this.turn = Math.min(200, this.turn + 1),
+            callbackScope: this,
+            loop: true
+        })
     }
 
     async sync_character() {
@@ -252,28 +262,28 @@ export class Start extends Phaser.Scene {
     cooldown = 100;
     last_pressed = 0;
     update(time) {
-        if (this.key.plus.isDown) {
-            if (time - this.last_pressed > this.cooldown) {
-                if (this.key.shift.isDown) {
-                    this.turn = Math.min(200, this.turn + 10);
-                } else {
-                    this.turn = Math.min(200, this.turn + 1);
-                }
-                this.last_pressed = time
-            }
-        } else if (this.key.minus.isDown) {
-            if (time - this.last_pressed > this.cooldown) {
-                if (this.key.shift.isDown) {
-                    this.turn = Math.max(0, this.turn - 10);
-                } else {
-                    this.turn = Math.max(0, this.turn - 1);
-                }
-                this.last_pressed = time
-            }
-        }
+        // if (this.key.plus.isDown) {
+        //     if (time - this.last_pressed > this.cooldown) {
+        //         if (this.key.shift.isDown) {
+        //             this.turn = Math.min(200, this.turn + 10);
+        //         } else {
+        //             this.turn = Math.min(200, this.turn + 1);
+        //         }
+        //         this.last_pressed = time
+        //     }
+        // } else if (this.key.minus.isDown) {
+        //     if (time - this.last_pressed > this.cooldown) {
+        //         if (this.key.shift.isDown) {
+        //             this.turn = Math.max(0, this.turn - 10);
+        //         } else {
+        //             this.turn = Math.max(0, this.turn - 1);
+        //         }
+        //         this.last_pressed = time
+        //     }
+        // }
         if (Phaser.Input.Keyboard.JustDown(this.key.next)) {
             let keys = Object.keys(this.characters);
-            for (let tex of this.pixel_textures){
+            for (let tex of this.pixel_textures) {
                 this.textures.get(tex).setFilter(Phaser.Textures.FilterMode.NEAREST);
             }
             if (this.last_track > keys.length) {
@@ -292,7 +302,7 @@ export class Start extends Phaser.Scene {
             this.last_track %= keys.length;
 
         } else if (this.key.all.isDown) {
-            for (let tex of this.pixel_textures){
+            for (let tex of this.pixel_textures) {
                 this.textures.get(tex).setFilter(Phaser.Textures.FilterMode.LINEAR);
             }
             this.cameras.main.stopFollow();
@@ -303,8 +313,8 @@ export class Start extends Phaser.Scene {
         for (let character of Object.values(this.characters)) {
             let x = character.spawn_x;
             let y = character.spawn_y;
-            for (let i = character.spawn_turn; i < this.turn && this.turn < character.opcodes.length; i++) {
-                switch (character.opcodes[i]) {
+            for (let i = character.spawn_turn; i < this.turn; i++) {
+                switch (character.opcodes[i - character.spawn_turn]) {
                     // up
                     case 1:
                         if (this.check_movable(x, y - 1)) y--;
